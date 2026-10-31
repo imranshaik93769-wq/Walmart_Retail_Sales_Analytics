@@ -1,200 +1,145 @@
-use zomato;
+use walmartdb;
 -- for checking the tables
 show tables;
 -- for checking the columns
-desc customers;
-desc rest;
-desc orders;
-desc rider;
-desc delveries;
--- add primary key to table's columns
--- customers
-alter table customers
-add primary key(customer_id);
--- deliveries
-alter table delveries
-add primary key(delivery_id);
--- orders
-alter table orders
-add primary key(order_id);
--- rest
-alter table rest
-add primary key(restaurant_id);
--- rider
-alter table rider
-add primary key(rider_id);
+desc Walmart_Sales;
 
--- add foregin key to table's columns
--- delveries
-alter table delveries
-add constraint fk_orders
-foreign key (order_id)
-references orders(order_id);
--- 
-alter table delveries
-add constraint fk_rider
-foreign key (rider_id)
-references rider(rider_id);
+-- add primary key to table's column
+alter table Walmart_Sales
+add primary key(invoice_id);
 
--- orders
-alter table orders
-add constraint fk_costomers
-foreign key (customer_id)
-references customers(customer_id);
---
-alter table orders
-add constraint fk_rest
-foreign key (restaurant_id)
-references rest(restaurant_id);
-
-use zomato;
--- Q1.Write a SQL query to display the top 3 order_items from the zomato database ranked by their order count.
-with ranked_items
+-- Q1. Write a SQL query to display the top 3 categories ranked by total units sold.
+with ranked_categories
 as
 (
-select order_item,count(order_item), 
-rank() over(order by count(order_item) desc) as rankk 
-from orders
-group by 1
+select category, sum(quantity) as total_units,
+rank() over(order by sum(quantity) desc) as rankk
+from Walmart_Sales
+group by category
 )
-select  * from ranked_items
-where
-rankk<=3;
+select * from ranked_categories
+where rankk <= 3;
 
--- Q2.Write a query to display top item from the top restaurant
-WITH TOP
+-- Q2. Write a query to display the best category (by revenue) in each branch.
+-- return the branch, city, category and revenue
+with branch_category
 as
 (
-select r.restaurant_name,o.order_item,
-count(o.order_item) as total_orders,
-rank() over(partition by r.restaurant_name order by count(o.order_item ) desc) as eeee
-from rest r join orders o on r.restaurant_id=o.restaurant_id
-group by 1,2
-
+select Branch, City, category,
+round(sum(unit_price * quantity), 2) as revenue,
+rank() over(partition by Branch order by sum(unit_price * quantity) desc) as rankk
+from Walmart_Sales
+group by Branch, City, category
 )
-select restaurant_name,order_item,total_orders
-from top
-order by 3 desc
-limit 1;
+select Branch, City, category, revenue
+from branch_category
+where rankk = 1
+order by revenue desc;
 
--- Q3. a query to display which person delvered most orders of veg biryani
-use zomato;
-SELECT 
-    r.rider_name,o.order_item,
-    COUNT(o.order_item) AS total_items
-FROM rider r
-JOIN delveries d 
-    ON r.rider_id = d.rider_id
-JOIN orders o 
-    ON d.order_id = o.order_id
-WHERE o.order_item = 'Veg Biryani'
-GROUP BY r.rider_name
-ORDER BY total_items DESC
-LIMIT 1;
+-- Q3. Write a query to display the top 5 branches by total revenue.
+-- return the branch, city, total orders, revenue and profit
+select Branch, City,
+count(invoice_id) as total_orders,
+round(sum(unit_price * quantity), 2) as revenue,
+round(sum(unit_price * quantity * profit_margin), 2) as profit
+from Walmart_Sales
+group by Branch, City
+order by revenue desc
+limit 5;
 
--- Q4. Write a query to display toatl orders of " priya sharma "  in the restauent name Pista House.
-use zomato;
-SELECT 
-    c.customer_name AS cname,
-    r.restaurant_name AS rname,
-    COUNT(o.order_item) AS total_orders
-FROM customers c
-JOIN orders o 
-    ON c.customer_id = o.customer_id
-JOIN rest r 
-    ON o.restaurant_id = r.restaurant_id
-WHERE c.customer_name= 'Priya Sharma'
-  AND r.restaurant_name = 'Pista House'
-GROUP BY c.customer_name, r.restaurant_name;
+-- Q4. Write a query to find revenue, profit, profit margin and revenue share (%) of each category.
+select category,
+round(sum(unit_price * quantity), 2) as revenue,
+round(sum(unit_price * quantity * profit_margin), 2) as profit,
+round(sum(unit_price * quantity * profit_margin) / sum(unit_price * quantity) * 100, 2) as profit_margin_pct,
+round(sum(unit_price * quantity) * 100 / sum(sum(unit_price * quantity)) over(), 2) as revenue_share_pct
+from Walmart_Sales
+group by category
+order by revenue desc;
 
--- Q5.Write a query to identify the time slots during which the most orders are placed. based on 2-hour intervals.
-use zomato;
+-- Q5. Write a query to compare payment methods.
+-- return the payment method, total orders, total revenue and average order value
+select payment_method,
+count(invoice_id) as total_orders,
+round(sum(unit_price * quantity), 2) as revenue,
+round(avg(unit_price * quantity), 2) as avg_order_value
+from Walmart_Sales
+group by payment_method
+order by revenue desc;
+
+-- Q6. Write a query to identify the time slots during which the most orders are placed. based on 2-hour intervals.
 select
 case
-	when extract(hour from order_time) between 0 and 1 then '00:00-02:00'
-	when extract(hour from order_time) between 2 and 3 then '02:00-04:00'
-	when extract(hour from order_time) between 4 and 5 then '04:00-06:00'
-	when extract(hour from order_time) between 6 and 7 then '06:00-08:00'
-	when extract(hour from order_time) between 8 and 9 then '08:00-10:00'
-    when extract(hour from order_time) between 10 and 11 then '10:00-12:00'
-    when extract(hour from order_time) between 12 and 13 then '12:00-14:00'
-    when extract(hour from order_time) between 14 and 15 then '14:00-16:00'
-    when extract(hour from order_time) between 16 and 17 then '16:00-18:00'
-    when extract(hour from order_time) between 18 and 19 then '18:00-20:00'
-    when extract(hour from order_time) between 20 and 21 then '20:00-22:00'
-    when extract(hour from order_time) between 22 and 23 then '22:00-00:00'
-end as  time_slot,
-count(order_id) as order_count
-from orders
+	when hour(time) between 0 and 1 then '00:00-02:00'
+	when hour(time) between 2 and 3 then '02:00-04:00'
+	when hour(time) between 4 and 5 then '04:00-06:00'
+	when hour(time) between 6 and 7 then '06:00-08:00'
+	when hour(time) between 8 and 9 then '08:00-10:00'
+	when hour(time) between 10 and 11 then '10:00-12:00'
+	when hour(time) between 12 and 13 then '12:00-14:00'
+	when hour(time) between 14 and 15 then '14:00-16:00'
+	when hour(time) between 16 and 17 then '16:00-18:00'
+	when hour(time) between 18 and 19 then '18:00-20:00'
+	when hour(time) between 20 and 21 then '20:00-22:00'
+	when hour(time) between 22 and 23 then '22:00-00:00'
+end as time_slot,
+count(invoice_id) as order_count,
+round(sum(unit_price * quantity), 2) as revenue
+from Walmart_Sales
 group by time_slot
-order by order_count desc
-;
+order by order_count desc;
 
--- Q6.Write a query to find average order value per customer who has placed more than 750 orders.
--- return the customer_name,and customer_id
-select c.customer_name,
-avg(o.total_amount) as aov
-from customers as c
-	join orders as o
-    on c.customer_id=o.customer_id
-group by 1
-having count(o.order_item)>750;
-;
+-- Q7. Write a query to find the branches whose average rating is above the overall average rating
+-- and which have at least 50 orders.
+-- return the branch, city, order count and average rating
+select Branch, City,
+count(invoice_id) as total_orders,
+round(avg(rating), 2) as avg_rating
+from Walmart_Sales
+group by Branch, City
+having count(invoice_id) >= 50
+   and avg(rating) > (select avg(rating) from Walmart_Sales)
+order by avg_rating desc;
 
--- Q7. Write a query to dispaly list of customers who have spent more than 10K in toatal on food orders.
--- return customer_name,customer_id
-select c.customer_name,c.customer_id,
-round(sum(o.total_amount),2) as total_spent 
-from customers as c
-	join orders as o
-    on c.customer_id=o.customer_id
-group by 1,2
-having sum(o.total_amount)>10000
-order by 3 desc
-;
-
--- Q8. Write a query to display to find the top 3 customers who spent height amount in each month.
--- return the customer_name
-WITH monthly_spending AS (
-    SELECT 
-        EXTRACT(YEAR FROM o.order_date) AS year,
-        EXTRACT(MONTH FROM o.order_date) AS month,
-        c.customer_name,
-        SUM(o.total_amount) AS total_spent,
-        RANK() OVER (
-            PARTITION BY EXTRACT(YEAR FROM o.order_date), EXTRACT(MONTH FROM o.order_date)
-            ORDER BY SUM(o.total_amount) DESC) AS rankk
-    FROM customers AS c
-    JOIN orders AS o 
-        ON c.customer_id = o.customer_id
-    GROUP BY year, month, c.customer_name
+-- Q8. Write a query to find the top 3 cities by revenue in each year.
+-- return the year, city and revenue
+with yearly_city
+as
+(
+select year(date) as yr, City,
+round(sum(unit_price * quantity), 2) as revenue,
+rank() over(partition by year(date) order by sum(unit_price * quantity) desc) as rankk
+from Walmart_Sales
+group by year(date), City
 )
-SELECT year, month, customer_name, total_spent
-FROM monthly_spending
-WHERE rankk <= 3
-ORDER BY year, month, total_spent DESC;
+select yr, City, revenue
+from yearly_city
+where rankk <= 3
+order by yr, revenue desc;
 
--- Q9.Write a query to display to find the ordres were placed but not delvivered.
--- return the rest name, city name and no.of not delivered orders
-SELECT
-    r.restaurant_name,
-    r.city,
-    COUNT(*) AS not_delivered_orders
-FROM orders o
-JOIN rest r
-    ON o.restaurant_id = r.restaurant_id
-JOIN delveries d
-    ON o.order_id = d.order_id
-WHERE d.delivery_status = 'Not Delivered'
-GROUP BY r.restaurant_name, r.city;
+-- Q9. Write a query to calculate the month-over-month revenue growth (%).
+-- return the year, month, revenue, previous month revenue and growth %
+with monthly_revenue
+as
+(
+select year(date) as yr, month(date) as mth,
+round(sum(unit_price * quantity), 2) as revenue
+from Walmart_Sales
+group by year(date), month(date)
+)
+select yr, mth, revenue,
+lag(revenue) over(order by yr, mth) as prev_month_revenue,
+round((revenue - lag(revenue) over(order by yr, mth)) * 100
+      / lag(revenue) over(order by yr, mth), 2) as growth_pct
+from monthly_revenue
+order by yr, mth;
 
--- Q10.Calculate the total revenue generated by each customer over all their orders.
--- return the customer name,id and CLV(customer lifetime value)
-use zomato;
-select 
-c.customer_id,c.customer_name,
-sum(o.total_amount) as CLV
-from orders as o
-	join customers as c
-	on o.customer_id=c.customer_id
-group by 1,2;
+-- Q10. Write a query to find which day of the week generates the most revenue.
+-- return the day name, total orders, revenue and average order value
+select dayname(date) as day_name,
+count(invoice_id) as total_orders,
+round(sum(unit_price * quantity), 2) as revenue,
+round(avg(unit_price * quantity), 2) as avg_order_value
+from Walmart_Sales
+group by dayname(date), dayofweek(date)
+order by revenue desc;
