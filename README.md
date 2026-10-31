@@ -103,8 +103,6 @@ The full script is in `SQL_Script.sql`. It answers 10 questions:
 
 The dashboard (`Walmart_Retail_Sales_Analytics_Dashboard.pbix`) is a one-page **Executive Sales Dashboard** built on the cleaned data.
 
-![Executive Sales Dashboard](images/dashboard.png)
-
 **Filters:** Date, Branch, City, Category, Payment Method and Time Period. Picking a value in any of them filters the whole page.
 
 **Summary cards:** Total Revenue ($1.21M), Total Transactions (9,969), Total Quantity (23,483), Total Profit ($476.14K) and Average Rating (5.83). Each card also shows the change compared with the previous period.
